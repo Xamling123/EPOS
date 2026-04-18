@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { menuAPI } from '../../api/menu'
 import { ordersAPI } from '../../api/orders'
+import { paymentsAPI } from '../../api/payments'
 import { handleApiError } from '../../api/errorHandler'
-import { Card, Button, Input, Loading } from '../../components/common/UI'
-import { Search, Plus, Minus, ShoppingCart, ArrowLeft, Send } from 'lucide-react'
+import { Card, Button, Input, Loading, Modal } from '../../components/common/UI'
+import { Search, Plus, Minus, ShoppingCart, ArrowLeft, Send, CreditCard, Banknote, AlertCircle } from 'lucide-react'
 
 export default function OrderEntry() {
     const { tableId } = useParams()
@@ -20,6 +21,10 @@ export default function OrderEntry() {
     const [modifierModalOpen, setModifierModalOpen] = useState(false)
     const [selectedItemForModifiers, setSelectedItemForModifiers] = useState(null)
     const [selectedModifiers, setSelectedModifiers] = useState([])
+    const [createdOrderId, setCreatedOrderId] = useState(null)
+    const [showPaymentModal, setShowPaymentModal] = useState(false)
+    const [paymentMethod, setPaymentMethod] = useState('cash')
+    const [paymentProcessing, setPaymentProcessing] = useState(false)
 
 
     useEffect(() => {
@@ -109,7 +114,7 @@ export default function OrderEntry() {
         setSubmitting(true)
         try {
             // Create order for table
-            await ordersAPI.create({
+            const response = await ordersAPI.create({
                 table: tableId,
                 items: cart.map(item => ({
                     menu_item: item.menu_item_id || item.id, // Handle unique cart IDs
@@ -120,15 +125,84 @@ export default function OrderEntry() {
                 order_type: 'dine_in',
                 priority: 'normal',
                 status: 'confirmed'
-
             })
-            alert('Order placed successfully!')
-            navigate('/waiter/tables')
+            
+            // Store the created order ID and show payment modal
+            setCreatedOrderId(response.data.id)
+            setShowPaymentModal(true)
         } catch (err) {
             const errorMsg = handleApiError('Submit Order', err)
             alert(errorMsg || 'Failed to submit order. Please try again.')
         } finally {
             setSubmitting(false)
+        }
+    }
+
+    const processPayment = async () => {
+        if (!createdOrderId) return
+        
+        setPaymentProcessing(true)
+        try {
+            if (paymentMethod === 'esewa') {
+                // Real eSewa payment integration
+                console.log('Initiating eSewa payment for order:', createdOrderId)
+                const response = await paymentsAPI.esewaInitiate(createdOrderId)
+                
+                if (response.data.success && response.data.form_data) {
+                    // Create and submit the eSewa form
+                    const form = document.createElement('form')
+                    form.method = 'POST'
+                    form.action = response.data.esewa_url || 'https://uat.esewa.com.np/epay/main'
+                    form.style.display = 'none'
+                    
+                    // Add form data
+                    Object.entries(response.data.form_data).forEach(([key, value]) => {
+                        const input = document.createElement('input')
+                        input.type = 'hidden'
+                        input.name = key
+                        input.value = value
+                        form.appendChild(input)
+                    })
+                    
+                    document.body.appendChild(form)
+                    form.submit()
+                    document.body.removeChild(form)
+                    
+                    // Store order ID for verification after redirect
+                    sessionStorage.setItem('pending_esewa_order', createdOrderId)
+                } else {
+                    console.error('eSewa initiation failed:', response.data)
+                    alert('Failed to initiate eSewa payment. Please try again.')
+                }
+            } else if (paymentMethod === 'khalti') {
+                // Khalti payment placeholder
+                const response = await paymentsAPI.mockGateway({
+                    order_id: createdOrderId,
+                    amount: cartTotal,
+                    payment_method: 'khalti',
+                    mock_success: true
+                })
+                
+                if (response.data.success) {
+                    alert('Order placed and payment received!')
+                    setShowPaymentModal(false)
+                    setCart([])
+                    setCreatedOrderId(null)
+                    navigate('/waiter/tables')
+                }
+            } else {
+                // Cash payment - just close and finish
+                alert('Order placed! Payment will be collected at counter.')
+                setShowPaymentModal(false)
+                setCart([])
+                setCreatedOrderId(null)
+                navigate('/waiter/tables')
+            }
+        } catch (err) {
+            console.error('Payment failed:', err)
+            alert(`Payment failed: ${err.response?.data?.detail || err.message}`)
+        } finally {
+            setPaymentProcessing(false)
         }
     }
 
@@ -268,6 +342,86 @@ export default function OrderEntry() {
                     </Button>
                 </div>
             </div>
+
+            {/* Payment Modal */}
+            <Modal
+                isOpen={showPaymentModal}
+                onClose={() => {
+                    setShowPaymentModal(false)
+                    setCreatedOrderId(null)
+                    setCart([])
+                    navigate('/waiter/tables')
+                }}
+                title="Payment Method"
+            >
+                <div className="space-y-6">
+                    <div className="bg-secondary-800/50 rounded-xl p-4">
+                        <p className="text-secondary-400 text-sm mb-2">Order Total</p>
+                        <p className="text-3xl font-bold text-primary-400">Rs.{cartTotal.toFixed(2)}</p>
+                    </div>
+
+                    <div>
+                        <p className="label mb-4">Select Payment Method</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            {[
+                                { value: 'cash', label: 'Cash', icon: Banknote, desc: 'Pay at counter' },
+                                { value: 'esewa', label: 'eSewa', icon: CreditCard, desc: 'Digital payment' },
+                                { value: 'card', label: 'Card', icon: CreditCard, desc: 'Credit/Debit' },
+                                { value: 'khalti', label: 'Khalti', icon: CreditCard, desc: 'Mobile wallet' },
+                            ].map((method) => (
+                                <button
+                                    key={method.value}
+                                    onClick={() => setPaymentMethod(method.value)}
+                                    className={`p-4 rounded-xl border-2 transition-all text-left
+                        ${paymentMethod === method.value
+                                            ? 'border-primary-500 bg-primary-500/10'
+                                            : 'border-secondary-700 hover:border-secondary-600'
+                                        }`}
+                                >
+                                    <method.icon className={`w-6 h-6 mb-2 ${paymentMethod === method.value ? 'text-primary-400' : 'text-secondary-400'}`} />
+                                    <p className={`font-semibold ${paymentMethod === method.value ? 'text-white' : 'text-secondary-300'}`}>
+                                        {method.label}
+                                    </p>
+                                    <p className="text-xs text-secondary-400 mt-1">{method.desc}</p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {paymentMethod === 'esewa' && (
+                        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 flex gap-3">
+                            <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-sm font-semibold text-blue-400">eSewa Payment</p>
+                                <p className="text-xs text-blue-300 mt-1">You will be redirected to eSewa to complete payment securely</p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex gap-3">
+                        <Button
+                            variant="secondary"
+                            onClick={() => {
+                                setShowPaymentModal(false)
+                                setCreatedOrderId(null)
+                                setCart([])
+                                navigate('/waiter/tables')
+                            }}
+                            className="flex-1"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={processPayment}
+                            loading={paymentProcessing}
+                            className="flex-1"
+                        >
+                            {paymentMethod === 'esewa' ? 'Pay via eSewa' : 'Confirm Payment'}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     )
 }
+

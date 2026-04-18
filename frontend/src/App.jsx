@@ -14,6 +14,7 @@ import Register from './pages/public/Register'
 import CustomerDashboard from './pages/customer/Dashboard'
 import MenuBrowse from './pages/customer/MenuBrowse'
 import CreateReservation from './pages/customer/CreateReservation'
+import CustomerCheckout from './pages/customer/Checkout'
 
 // Payment Pages
 import { PaymentSuccess, PaymentFailure, PaymentPending } from './pages/payment/PaymentPages'
@@ -78,6 +79,14 @@ function App() {
                             element={
                                 <ProtectedRoute>
                                     <CustomerDashboard />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path="/checkout"
+                            element={
+                                <ProtectedRoute>
+                                    <CustomerCheckout />
                                 </ProtectedRoute>
                             }
                         />
