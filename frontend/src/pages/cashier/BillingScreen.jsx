@@ -8,7 +8,8 @@ import {
     Banknote,
     CheckCircle,
     Printer,
-    RefreshCw
+    RefreshCw,
+    AlertCircle
 } from 'lucide-react'
 
 export function BillingScreen() {
@@ -49,14 +50,51 @@ export function BillingScreen() {
 
         setProcessing(true)
         try {
-            if (['khalti', 'esewa'].includes(paymentMethod)) {
-                // Use mock gateway
+            if (paymentMethod === 'esewa') {
+                // Real eSewa payment integration
+                console.log('Initiating eSewa payment for order:', selectedOrder.id)
+                const response = await paymentsAPI.esewaInitiate(selectedOrder.id)
+                
+                if (response.data.success && response.data.form_data) {
+                    // Create and submit the eSewa form
+                    const form = document.createElement('form')
+                    form.method = 'POST'
+                    form.action = response.data.esewa_url || 'https://uat.esewa.com.np/epay/main'
+                    form.style.display = 'none'
+                    
+                    // Add form data
+                    Object.entries(response.data.form_data).forEach(([key, value]) => {
+                        const input = document.createElement('input')
+                        input.type = 'hidden'
+                        input.name = key
+                        input.value = value
+                        form.appendChild(input)
+                    })
+                    
+                    document.body.appendChild(form)
+                    form.submit()
+                    document.body.removeChild(form)
+                    
+                    // Store order ID in session for verification after redirect
+                    sessionStorage.setItem('pending_esewa_order', selectedOrder.id)
+                    
+                    setSelectedOrder(null)
+                    setInvoice(null)
+                } else {
+                    console.error('eSewa initiation failed:', response.data)
+                    alert('Failed to initiate eSewa payment. Please try again.')
+                }
+            } else if (paymentMethod === 'khalti') {
+                // Khalti payment (currently mock)
                 await paymentsAPI.mockGateway({
                     order_id: selectedOrder.id,
                     amount: parseFloat(invoice.total),
                     payment_method: paymentMethod,
                     mock_success: true
                 })
+                setSelectedOrder(null)
+                setInvoice(null)
+                fetchBillingQueue()
             } else {
                 // Cash or card payment
                 await paymentsAPI.create({
@@ -64,13 +102,13 @@ export function BillingScreen() {
                     amount: invoice.total,
                     payment_method: paymentMethod
                 })
+                setSelectedOrder(null)
+                setInvoice(null)
+                fetchBillingQueue()
             }
-
-            setSelectedOrder(null)
-            setInvoice(null)
-            fetchBillingQueue()
         } catch (err) {
             console.error('Payment failed:', err)
+            alert(`Payment failed: ${err.response?.data?.detail || err.message}`)
         } finally {
             setProcessing(false)
         }
