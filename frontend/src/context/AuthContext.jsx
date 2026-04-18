@@ -29,6 +29,8 @@ export function AuthProvider({ children }) {
         try {
             setError(null)
             const response = await authAPI.login(email, password)
+            console.log('Login response:', response.data)
+            
             const { access, refresh, user: userData } = response.data
 
             localStorage.setItem('access_token', access)
@@ -38,7 +40,37 @@ export function AuthProvider({ children }) {
             setUser(userData)
             return { success: true, user: userData }
         } catch (err) {
-            const message = err.response?.data?.error?.message || 'Login failed'
+            // Handle different error response formats
+            let message = 'Login failed'
+            
+            console.log('Login error details:', {
+                status: err.response?.status,
+                data: err.response?.data,
+                message: err.message,
+            })
+            
+            if (err.response?.data) {
+                const data = err.response.data
+                // Handle DRF error format (detail or non_field_errors)
+                if (data.detail) {
+                    message = data.detail
+                } else if (data.non_field_errors) {
+                    message = Array.isArray(data.non_field_errors) 
+                        ? data.non_field_errors[0] 
+                        : data.non_field_errors
+                } else if (data.error?.message) {
+                    // Custom error format
+                    message = data.error.message
+                } else if (data.message) {
+                    message = data.message
+                } else if (typeof data === 'string') {
+                    message = data
+                }
+            } else if (err.message) {
+                message = err.message
+            }
+            
+            console.log('Login error message:', message)
             setError(message)
             return { success: false, error: message }
         }
@@ -57,7 +89,34 @@ export function AuthProvider({ children }) {
             setUser(newUser)
             return { success: true, user: newUser }
         } catch (err) {
-            const message = err.response?.data?.error?.message || 'Registration failed'
+            // Handle different error response formats
+            let message = 'Registration failed'
+            
+            if (err.response?.data) {
+                const data = err.response.data
+                // Handle DRF validation errors (field-specific)
+                if (typeof data === 'object' && !Array.isArray(data)) {
+                    // Look for field errors
+                    for (const [field, errors] of Object.entries(data)) {
+                        if (Array.isArray(errors)) {
+                            message = `${field}: ${errors[0]}`
+                            break
+                        } else if (typeof errors === 'string') {
+                            message = `${field}: ${errors}`
+                            break
+                        }
+                    }
+                } else if (data.detail) {
+                    message = data.detail
+                } else if (data.message) {
+                    message = data.message
+                } else if (typeof data === 'string') {
+                    message = data
+                }
+            } else if (err.message) {
+                message = err.message
+            }
+            
             setError(message)
             return { success: false, error: message }
         }

@@ -28,6 +28,15 @@ api.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config
 
+        // Log error details for debugging
+        if (originalRequest.url?.includes('/auth/')) {
+            console.log('Auth request error:', {
+                status: error.response?.status,
+                data: error.response?.data,
+                url: originalRequest.url,
+            })
+        }
+
         // If 401 and not already retrying
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true

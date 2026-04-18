@@ -30,12 +30,14 @@ export function Login() {
         if (result.success) {
             // Redirect based on role
             const user = result.user
+            console.log('Login successful, user role:', user.role)
             if (user.role === 'admin') navigate('/admin')
             else if (user.role === 'waiter') navigate('/waiter')
             else if (user.role === 'chef') navigate('/kitchen')
             else if (user.role === 'cashier') navigate('/cashier')
             else navigate(from)
         } else {
+            console.error('Login failed:', result.error)
             setError(result.error || 'Invalid email or password')
         }
     }
