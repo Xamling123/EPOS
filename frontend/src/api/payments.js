@@ -21,6 +21,14 @@ export const paymentsAPI = {
 
     getSummary: () =>
         api.get('/payments/summary/'),
+    
+    // eSewa Payment Methods
+    esewaInitiate: (orderId) =>
+        api.post('/payments/esewa_initiate/', { order_id: orderId }),
+    
+    esewaVerify: (verificationData) =>
+        api.post('/payments/esewa_verify/', verificationData),
 }
 
 export default paymentsAPI
+

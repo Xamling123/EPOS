@@ -15,6 +15,9 @@ import CustomerDashboard from './pages/customer/Dashboard'
 import MenuBrowse from './pages/customer/MenuBrowse'
 import CreateReservation from './pages/customer/CreateReservation'
 
+// Payment Pages
+import { PaymentSuccess, PaymentFailure, PaymentPending } from './pages/payment/PaymentPages'
+
 // Staff Pages
 import KitchenDisplay from './pages/chef/KitchenDisplay'
 import BillingScreen from './pages/cashier/BillingScreen'
@@ -62,6 +65,11 @@ function App() {
                     {/* Auth Routes (no layout) */}
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
+
+                    {/* Payment Routes */}
+                    <Route path="/payment/success" element={<PaymentSuccess />} />
+                    <Route path="/payment/failure" element={<PaymentFailure />} />
+                    <Route path="/payment/pending" element={<PaymentPending />} />
 
                     {/* Customer Protected Routes */}
                     <Route element={<MainLayout />}>

@@ -5,6 +5,7 @@ Payment views for processing payments and mock gateway.
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 from django.utils import timezone
 from core.permissions import IsCashier, IsAdmin, IsStaff
 from .models import Payment
@@ -14,6 +15,10 @@ from .serializers import (
     MockGatewaySerializer,
 )
 from apps.orders.models import Order
+from .esewa import get_esewa_gateway
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
@@ -212,3 +217,139 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 'by_method': list(by_method)
             }
         })
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAdmin])
+    def esewa_initiate(self, request):
+        """
+        Initiate eSewa payment for an order.
+        Returns payment payload and URL for redirecting to eSewa.
+        """
+        order_id = request.data.get('order_id')
+        
+        try:
+            order = Order.objects.get(pk=order_id)
+        except Order.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Order not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        if order.is_paid:
+            return Response({
+                'success': False,
+                'error': 'Order already paid'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create pending payment
+        payment = Payment.objects.create(
+            order=order,
+            amount=order.total_amount,
+            payment_method='esewa',
+            status='pending',
+            processed_by=request.user
+        )
+        
+        # Get eSewa gateway
+        gateway = get_esewa_gateway(use_test=True)
+        payment_data = gateway.generate_payment_payload(order)
+        
+        # Store transaction UUID in payment for later verification
+        payment.gateway_response = {
+            'transaction_uuid': payment_data['transaction_uuid'],
+            'status': 'initiated'
+        }
+        payment.save()
+        
+        logger.info(f"eSewa payment initiated for order {order_id} with UUID {payment_data['transaction_uuid']}")
+        
+        return Response({
+            'success': True,
+            'payment_id': payment.id,
+            'order_id': order.id,
+            'amount': str(order.total_amount),
+            'payment_url': payment_data['payment_url'],
+            'payload': payment_data['payload'],
+            'message': 'Redirecting to eSewa for payment'
+        })
+    
+    @action(detail=False, methods=['post', 'get'], permission_classes=[AllowAny])
+    def esewa_verify(self, request):
+        """
+        Verify eSewa payment callback.
+        eSewa redirects here after payment with status and UUID.
+        """
+        # Get the data from either GET or POST
+        data = request.query_params if request.method == 'GET' else request.data
+        
+        transaction_uuid = data.get('uuid')
+        pid = data.get('pid')  # Order identifier from eSewa
+        ref_id = data.get('refId')  # Reference ID from eSewa
+        
+        if not transaction_uuid:
+            return Response({
+                'success': False,
+                'error': 'Missing transaction UUID'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Find payment by transaction UUID
+        try:
+            payment = Payment.objects.get(
+                gateway_response__transaction_uuid=transaction_uuid
+            )
+        except Payment.DoesNotExist:
+            logger.error(f"Payment not found for UUID: {transaction_uuid}")
+            return Response({
+                'success': False,
+                'error': 'Payment record not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Verify with eSewa
+        gateway = get_esewa_gateway(use_test=True)
+        verification = gateway.process_payment_callback(data)
+        
+        if verification['success']:
+            # Payment successful
+            payment.status = 'completed'
+            payment.transaction_id = ref_id or transaction_uuid
+            payment.gateway_response = {
+                **payment.gateway_response,
+                'verification': verification['verification_data'],
+                'status': 'verified',
+                'ref_id': ref_id
+            }
+            payment.save()
+            
+            # Update order
+            order = payment.order
+            order.is_paid = True
+            order.status = 'closed'
+            order.cashier = payment.processed_by
+            order.closed_at = timezone.now()
+            order.save(update_fields=['is_paid', 'status', 'cashier', 'closed_at', 'updated_at'])
+            
+            logger.info(f"eSewa payment verified for order {order.id}")
+            
+            return Response({
+                'success': True,
+                'message': 'Payment verified successfully',
+                'payment': PaymentSerializer(payment).data,
+                'redirect_url': f'/payment/success?order_id={order.id}&payment_id={payment.id}'
+            })
+        else:
+            # Payment failed
+            payment.status = 'failed'
+            payment.gateway_response = {
+                **payment.gateway_response,
+                'verification': verification.get('verification_data'),
+                'status': 'failed',
+                'error': verification.get('error')
+            }
+            payment.save()
+            
+            logger.error(f"eSewa payment verification failed for order {payment.order.id}: {verification.get('error')}")
+            
+            return Response({
+                'success': False,
+                'error': verification.get('error', 'Payment verification failed'),
+                'redirect_url': f'/payment/failure?order_id={payment.order.id}&payment_id={payment.id}'
+            }, status=status.HTTP_400_BAD_REQUEST)

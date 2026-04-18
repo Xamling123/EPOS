@@ -198,3 +198,30 @@ LOGGING = {
         'level': 'INFO',
     },
 }
+
+# ========================================
+# eSewa Payment Gateway Configuration
+# ========================================
+# Test/Demo Merchant Account for eSewa
+# CREDENTIALS FOR DEVELOPMENT/TESTING:
+#   Merchant Code: EPAYTEST
+#   Merchant Secret: 8gBm/:&EnhH.1/q
+#   Merchant Email: test@esewa.com.np (for test portal login)
+# 
+# To get your own eSewa merchant account:
+#   1. Visit: https://esewa.com.np/
+#   2. Go to: Business/Merchant > Sign Up
+#   3. Fill the merchant registration form
+#   4. Get your credentials and update these settings
+# ========================================
+
+ESEWA_MERCHANT_CODE = os.getenv('ESEWA_MERCHANT_CODE', 'EPAYTEST')
+ESEWA_MERCHANT_SECRET = os.getenv('ESEWA_MERCHANT_SECRET', '8gBm/:&EnhH.1/q')
+ESEWA_USE_TEST = os.getenv('ESEWA_USE_TEST', 'True').lower() == 'true'
+
+# eSewa URLs - Frontend must redirect to these
+ESEWA_RETURN_URL = os.getenv('ESEWA_RETURN_URL', 'http://localhost:5173/payment/success')
+ESEWA_FAILURE_URL = os.getenv('ESEWA_FAILURE_URL', 'http://localhost:5173/payment/failure')
+
+# Backend verification endpoint
+ESEWA_VERIFY_ENDPOINT = os.getenv('ESEWA_VERIFY_ENDPOINT', 'http://localhost:8000/api/payments/esewa/verify')
