@@ -14,7 +14,6 @@ export function PaymentGateway({ order, onPaymentComplete, onPaymentFailed }) {
 
     const paymentMethods = [
         { id: 'cash', name: 'Cash', icon: '💵', description: 'Pay in cash at counter' },
-        { id: 'esewa', name: 'eSewa', icon: '📱', description: 'Pay using eSewa wallet' },
         { id: 'mock', name: 'Test Payment', icon: '✓', description: 'Test mode (auto-approved)' },
     ]
 
@@ -41,44 +40,6 @@ export function PaymentGateway({ order, onPaymentComplete, onPaymentFailed }) {
         }
     }
 
-    const handleEsewaPayment = async () => {
-        setProcessing(true)
-        setError('')
-        try {
-            // Initiate eSewa payment
-            const response = await paymentsAPI.esewaInitiate(order.id)
-            
-            if (response.data.success) {
-                // Store payment data for verification after returning from eSewa
-                sessionStorage.setItem('esewaPaymentId', response.data.payment_id)
-                sessionStorage.setItem('esewaOrderId', order.id)
-                
-                // Redirect to eSewa payment form
-                const form = document.createElement('form')
-                form.method = 'POST'
-                form.action = response.data.payment_url
-                
-                // Add payload data to form
-                Object.keys(response.data.payload).forEach(key => {
-                    const input = document.createElement('input')
-                    input.type = 'hidden'
-                    input.name = key
-                    input.value = response.data.payload[key]
-                    form.appendChild(input)
-                })
-                
-                document.body.appendChild(form)
-                form.submit()
-            } else {
-                setError(response.data.error || 'Failed to initiate eSewa payment')
-            }
-        } catch (err) {
-            const errorMsg = handleApiError('eSewa Payment Initiation', err)
-            setError(errorMsg)
-        } finally {
-            setProcessing(false)
-        }
-    }
 
     const handleTestPayment = async () => {
         setProcessing(true)
@@ -88,7 +49,7 @@ export function PaymentGateway({ order, onPaymentComplete, onPaymentFailed }) {
             const response = await paymentsAPI.mockGateway({
                 order_id: order.id,
                 amount: order.total_amount,
-                payment_method: 'esewa',
+                payment_method: 'cash',
                 mock_success: true
             })
             
@@ -107,9 +68,6 @@ export function PaymentGateway({ order, onPaymentComplete, onPaymentFailed }) {
         switch (method.id) {
             case 'cash':
                 handleCashPayment()
-                break
-            case 'esewa':
-                handleEsewaPayment()
                 break
             case 'mock':
                 handleTestPayment()
@@ -212,19 +170,6 @@ export function PaymentGateway({ order, onPaymentComplete, onPaymentFailed }) {
                     <p className="text-sm text-red-400">{error}</p>
                 </div>
             )}
-
-            {/* Test Credentials Info */}
-            <Card className="bg-blue-500/10 border border-blue-500/30">
-                <h4 className="font-semibold text-blue-400 mb-2">eSewa Test Credentials</h4>
-                <div className="text-xs text-secondary-300 space-y-1">
-                    <p><strong>Merchant Code:</strong> EPAYTEST</p>
-                    <p><strong>Merchant Secret:</strong> 8gBm/:&EnhH.1/q</p>
-                    <p><strong>Test Amount:</strong> Any amount (Rs. 1 - 999,999)</p>
-                    <p className="pt-2 text-blue-300">
-                        ℹ️ You can test eSewa with any valid Nepali phone number or use test credentials at uat.esewa.com.np
-                    </p>
-                </div>
-            </Card>
         </div>
     )
 }

@@ -76,7 +76,7 @@ and optimize restaurant workflow.
 
 ### Integrations
 
--   Khalti / eSewa Payment Gateway
+-   Khalti Payment Gateway
 -   Cloud deployment (Railway / Netlify)
 
 ------------------------------------------------------------------------

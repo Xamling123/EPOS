@@ -50,41 +50,7 @@ export function BillingScreen() {
 
         setProcessing(true)
         try {
-            if (paymentMethod === 'esewa') {
-                // Real eSewa payment integration
-                console.log('Initiating eSewa payment for order:', selectedOrder.id)
-                const response = await paymentsAPI.esewaInitiate(selectedOrder.id)
-                
-                if (response.data.success && response.data.form_data) {
-                    // Create and submit the eSewa form
-                    const form = document.createElement('form')
-                    form.method = 'POST'
-                    form.action = response.data.esewa_url || 'https://uat.esewa.com.np/epay/main'
-                    form.style.display = 'none'
-                    
-                    // Add form data
-                    Object.entries(response.data.form_data).forEach(([key, value]) => {
-                        const input = document.createElement('input')
-                        input.type = 'hidden'
-                        input.name = key
-                        input.value = value
-                        form.appendChild(input)
-                    })
-                    
-                    document.body.appendChild(form)
-                    form.submit()
-                    document.body.removeChild(form)
-                    
-                    // Store order ID in session for verification after redirect
-                    sessionStorage.setItem('pending_esewa_order', selectedOrder.id)
-                    
-                    setSelectedOrder(null)
-                    setInvoice(null)
-                } else {
-                    console.error('eSewa initiation failed:', response.data)
-                    alert('Failed to initiate eSewa payment. Please try again.')
-                }
-            } else if (paymentMethod === 'khalti') {
+            if (paymentMethod === 'khalti') {
                 // Khalti payment (currently mock)
                 await paymentsAPI.mockGateway({
                     order_id: selectedOrder.id,
@@ -255,7 +221,6 @@ export function BillingScreen() {
                                     { value: 'cash', label: 'Cash', icon: Banknote },
                                     { value: 'card', label: 'Card', icon: CreditCard },
                                     { value: 'khalti', label: 'Khalti', icon: CreditCard },
-                                    { value: 'esewa', label: 'eSewa', icon: CreditCard },
                                 ].map((method) => (
                                     <button
                                         key={method.value}

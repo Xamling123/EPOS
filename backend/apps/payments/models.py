@@ -17,7 +17,6 @@ class Payment(models.Model):
         ('cash', 'Cash'),
         ('card', 'Card'),
         ('khalti', 'Khalti'),
-        ('esewa', 'eSewa'),
     ]
     
     STATUS_CHOICES = [

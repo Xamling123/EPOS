@@ -79,7 +79,7 @@ export function CreateReservation() {
 
     const selectTable = (tableId) => {
         setFormData(prev => ({ ...prev, tableId }))
-        setStep(3)
+        setStep(3)  // Skip deposit, go directly to confirmation
     }
 
     const submitReservation = async () => {
@@ -309,7 +309,7 @@ export function CreateReservation() {
                     </div>
                 )}
 
-                {/* Step 3: Confirm */}
+                {/* Step 3: Confirm Reservation */}
                 {step === 3 && (
                     <Card className="max-w-xl mx-auto animate-fade-in">
                         <h2 className="text-xl font-semibold text-white mb-6">Confirm Reservation</h2>

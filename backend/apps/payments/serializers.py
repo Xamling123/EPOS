@@ -63,6 +63,6 @@ class MockGatewaySerializer(serializers.Serializer):
     
     order_id = serializers.IntegerField()
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
-    payment_method = serializers.ChoiceField(choices=['khalti', 'esewa'])
+    payment_method = serializers.ChoiceField(choices=['khalti'])
     # Mock fields
     mock_success = serializers.BooleanField(default=True, help_text="Set to False to simulate failure")

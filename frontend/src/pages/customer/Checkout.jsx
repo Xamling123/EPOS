@@ -4,6 +4,7 @@ import { ordersAPI } from '../../api/orders'
 import { paymentsAPI } from '../../api/payments'
 import { handleApiError } from '../../api/errorHandler'
 import { Card, Badge, Button, Loading, Modal } from '../../components/common/UI'
+import { DepositPayment } from '../../components/payment/DepositPayment'
 import {
     ShoppingCart,
     CreditCard,
@@ -14,11 +15,15 @@ import {
     AlertCircle
 } from 'lucide-react'
 
+const DEPOSIT_AMOUNT = 500 // Rs. 500 deposit for food orders
+
 export function CustomerCheckout() {
     const navigate = useNavigate()
     const location = useLocation()
     const [order, setOrder] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [depositPaid, setDepositPaid] = useState(false)
+    const [depositProcessing, setDepositProcessing] = useState(false)
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [paymentMethod, setPaymentMethod] = useState('cash')
     const [paymentProcessing, setPaymentProcessing] = useState(false)
@@ -50,38 +55,7 @@ export function CustomerCheckout() {
 
         setPaymentProcessing(true)
         try {
-            if (paymentMethod === 'esewa') {
-                // Real eSewa payment integration
-                console.log('Initiating eSewa payment for order:', order.id)
-                const response = await paymentsAPI.esewaInitiate(order.id)
-                
-                if (response.data.success && response.data.form_data) {
-                    // Create and submit the eSewa form
-                    const form = document.createElement('form')
-                    form.method = 'POST'
-                    form.action = response.data.esewa_url || 'https://uat.esewa.com.np/epay/main'
-                    form.style.display = 'none'
-                    
-                    // Add form data
-                    Object.entries(response.data.form_data).forEach(([key, value]) => {
-                        const input = document.createElement('input')
-                        input.type = 'hidden'
-                        input.name = key
-                        input.value = value
-                        form.appendChild(input)
-                    })
-                    
-                    document.body.appendChild(form)
-                    form.submit()
-                    document.body.removeChild(form)
-                    
-                    // Store order ID in session for verification after redirect
-                    sessionStorage.setItem('pending_esewa_order', order.id)
-                } else {
-                    console.error('eSewa initiation failed:', response.data)
-                    alert('Failed to initiate eSewa payment. Please try again.')
-                }
-            } else if (paymentMethod === 'khalti') {
+            if (paymentMethod === 'khalti') {
                 // Khalti payment (mock)
                 const response = await paymentsAPI.mockGateway({
                     order_id: order.id,
@@ -146,6 +120,69 @@ export function CustomerCheckout() {
         )
     }
 
+    // STEP 1: Deposit Payment (Required BEFORE proceeding)
+    if (!depositPaid) {
+        return (
+            <div className="min-h-screen bg-secondary-950 py-12">
+                <div className="container mx-auto px-4 max-w-2xl">
+                    {/* Header */}
+                    <div className="flex items-center gap-4 mb-8">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => navigate('/dashboard')}
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                        </Button>
+                        <h1 className="text-3xl font-display font-bold text-white">
+                            Complete Deposit Payment
+                        </h1>
+                    </div>
+
+                    <DepositPayment
+                        amount={DEPOSIT_AMOUNT}
+                        orderType="order"
+                        orderId={order.id}
+                        loading={depositProcessing}
+                        onPaymentSuccess={() => setDepositPaid(true)}
+                        onPaymentFailed={(error) => {
+                            console.error('Deposit payment failed:', error)
+                        }}
+                    />
+
+                    {/* Info Section */}
+                    <Card className="mt-8">
+                        <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                            <ShoppingCart className="w-5 h-5" />
+                            Your Order
+                        </h3>
+                        <div className="space-y-3">
+                            {order.items?.slice(0, 3).map((item, idx) => (
+                                <div key={idx} className="flex justify-between text-sm">
+                                    <span className="text-secondary-300">
+                                        {item.quantity}x {item.item_name}
+                                    </span>
+                                    <span className="text-secondary-400">Rs.{item.total_price}</span>
+                                </div>
+                            ))}
+                            {order.items?.length > 3 && (
+                                <p className="text-xs text-secondary-500 pt-2">
+                                    + {order.items.length - 3} more items
+                                </p>
+                            )}
+                            <div className="pt-3 border-t border-secondary-700 flex justify-between font-semibold">
+                                <span className="text-white">Total Amount</span>
+                                <span className="text-primary-400">Rs.{order.total_amount}</span>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            </div>
+        )
+    }
+
+    // STEP 2: Final Payment (After deposit is paid)
+
     const orderTotal = parseFloat(order.total_amount)
 
     return (
@@ -177,6 +214,17 @@ export function CustomerCheckout() {
                         <Badge variant={order.status === 'paid' ? 'success' : 'info'}>
                             {order.status}
                         </Badge>
+                    </div>
+
+                    {/* Deposit Info */}
+                    <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 mb-6 flex gap-3">
+                        <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                            <p className="text-sm font-semibold text-green-400">✓ Deposit Paid</p>
+                            <p className="text-xs text-green-300 mt-1">
+                                Rs.{DEPOSIT_AMOUNT} deposit has been paid and credited to your bill.
+                            </p>
+                        </div>
                     </div>
 
                     {/* Order Items */}
@@ -216,7 +264,6 @@ export function CustomerCheckout() {
                     <div className="grid grid-cols-2 gap-3 mb-6">
                         {[
                             { value: 'cash', label: 'Cash', icon: Banknote, desc: 'Pay at counter' },
-                            { value: 'esewa', label: 'eSewa', icon: CreditCard, desc: 'Fast & Secure' },
                             { value: 'card', label: 'Card', icon: CreditCard, desc: 'Credit/Debit' },
                             { value: 'khalti', label: 'Khalti', icon: Wallet, desc: 'Mobile Wallet' },
                         ].map((method) => (
@@ -238,17 +285,6 @@ export function CustomerCheckout() {
                         ))}
                     </div>
 
-                    {paymentMethod === 'esewa' && (
-                        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-6 flex gap-3">
-                            <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                            <div>
-                                <p className="text-sm font-semibold text-blue-400">eSewa Payment</p>
-                                <p className="text-xs text-blue-300 mt-1">
-                                    Click "Pay Now" to securely pay via eSewa. You'll be redirected to complete the payment.
-                                </p>
-                            </div>
-                        </div>
-                    )}
 
                     <Button
                         fullWidth
@@ -256,7 +292,7 @@ export function CustomerCheckout() {
                         onClick={processPayment}
                         loading={paymentProcessing}
                     >
-                        {paymentMethod === 'esewa' ? '📱 Pay via eSewa' : paymentMethod === 'cash' ? 'Confirm Order' : 'Pay Now'}
+                        {paymentMethod === 'cash' ? 'Confirm Order' : 'Pay Now'}
                     </Button>
                 </Card>
 
