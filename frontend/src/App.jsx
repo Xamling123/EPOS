@@ -34,6 +34,7 @@ import InventoryManagement from './pages/admin/InventoryManagement'
 import TableMap from './pages/waiter/TableMap'
 import ActiveOrders from './pages/waiter/ActiveOrders'
 import OrderEntry from './pages/waiter/OrderEntry'
+import ViewOrder from './pages/waiter/ViewOrder'
 
 // Layouts
 import WaiterLayout from './components/layout/WaiterLayout'
@@ -141,6 +142,7 @@ function App() {
                         <Route index element={<TableMap />} />
                         <Route path="tables" element={<TableMap />} />
                         <Route path="orders" element={<ActiveOrders />} />
+                        <Route path="orders/:orderId" element={<ViewOrder />} />
                         <Route path="order-entry/:tableId" element={<OrderEntry />} />
                     </Route>
                 </Routes>
