@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useWebSocket } from '../../context/WebSocketContext'
 import { ordersAPI } from '../../api/orders'
 import { handleApiError } from '../../api/errorHandler'
 import { Card, Badge, Button, Loading } from '../../components/common/UI'
-import { Clock, CheckCircle, RefreshCw } from 'lucide-react'
+import { Clock, CheckCircle, RefreshCw, Edit2 } from 'lucide-react'
 
 export default function ActiveOrders() {
+    const navigate = useNavigate()
     const [orders, setOrders] = useState([])
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
@@ -88,10 +90,13 @@ export default function ActiveOrders() {
                 {orders.map(order => (
                     <Card key={order.id} className="flex flex-col">
                         <div className="flex justify-between items-start mb-4 pb-4 border-b border-secondary-800">
-                            <div>
+                            <button
+                                onClick={() => navigate(`/waiter/orders/${order.id}`)}
+                                className="text-left flex-1 hover:opacity-80 transition-opacity"
+                            >
                                 <h3 className="text-lg font-bold text-white">Order #{order.id}</h3>
                                 <p className="text-secondary-400">Table {order.table_details?.table_number}</p>
-                            </div>
+                            </button>
                             <div className="text-right">
                                 <Badge variant={order.status === 'ready' ? 'success' : 'warning'}>
                                     {order.status.toUpperCase()}
@@ -109,27 +114,38 @@ export default function ActiveOrders() {
                             </div>
                         </div>
 
-                        {order.status === 'pending' && (
+                        <div className="flex gap-2">
                             <Button
-                                className="w-full mt-auto"
-                                onClick={() => confirmOrder(order.id)}
-                                loading={updating === order.id}
+                                variant="secondary"
+                                className="flex-1"
+                                onClick={() => navigate(`/waiter/orders/${order.id}`)}
                             >
-                                <CheckCircle className="w-5 h-5 mr-2" />
-                                Confirm Order
+                                <Edit2 className="w-4 h-4 mr-2" />
+                                View Details
                             </Button>
-                        )}
 
-                        {order.status === 'ready' && (
-                            <Button
-                                className="w-full mt-auto"
-                                onClick={() => markServed(order.id)}
-                                loading={updating === order.id}
-                            >
-                                <CheckCircle className="w-5 h-5 mr-2" />
-                                Mark Served
-                            </Button>
-                        )}
+                            {order.status === 'pending' && (
+                                <Button
+                                    className="flex-1"
+                                    onClick={() => confirmOrder(order.id)}
+                                    loading={updating === order.id}
+                                >
+                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                    Confirm
+                                </Button>
+                            )}
+
+                            {order.status === 'ready' && (
+                                <Button
+                                    className="flex-1"
+                                    onClick={() => markServed(order.id)}
+                                    loading={updating === order.id}
+                                >
+                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                    Served
+                                </Button>
+                            )}
+                        </div>
                     </Card>
                 ))}
 
