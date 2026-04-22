@@ -131,12 +131,64 @@ class OrderViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save(order=order)
         
+        order.calculate_totals()
         order.refresh_from_db()
         return Response({
             'success': True,
             'message': 'Item added successfully',
             'order': OrderSerializer(order).data
         })
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsWaiter])
+    def update_item_quantity(self, request, pk=None):
+        """Update item quantity."""
+        order = self.get_object()
+        
+        if not order.is_editable():
+            return Response({'success': False, 'error': 'Cannot modify a closed or paid order.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        item_id = request.data.get('item_id')
+        quantity = request.data.get('quantity')
+        
+        if not item_id or quantity is None:
+            return Response({'success': False, 'error': 'item_id and quantity are required.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            quantity = int(quantity)
+            if quantity < 1:
+                return Response({'success': False, 'error': 'Quantity must be at least 1.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            item = order.items.get(pk=item_id)
+            item.quantity = quantity
+            item.save()  # This will recalculate totals via OrderItem.save()
+            
+            order.refresh_from_db()
+            return Response({'success': True, 'order': OrderSerializer(order).data})
+        except OrderItem.DoesNotExist:
+            return Response({'success': False, 'error': 'Item not found in this order.'}, status=status.HTTP_404_NOT_FOUND)
+        except (ValueError, TypeError):
+            return Response({'success': False, 'error': 'Invalid quantity.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsWaiter])
+    def remove_item(self, request, pk=None):
+        """Remove an item from the order."""
+        order = self.get_object()
+        
+        if not order.is_editable():
+            return Response({'success': False, 'error': 'Cannot modify a closed or paid order.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        item_id = request.data.get('item_id')
+        if not item_id:
+            return Response({'success': False, 'error': 'item_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            item = order.items.get(pk=item_id)
+            item.delete()
+            order.calculate_totals()
+            order.refresh_from_db()
+            return Response({'success': True, 'order': OrderSerializer(order).data})
+        except OrderItem.DoesNotExist:
+            return Response({'success': False, 'error': 'Item not found in this order.'}, status=status.HTTP_404_NOT_FOUND)
     
     @action(detail=True, methods=['post'], permission_classes=[IsWaiter])
     def update_status(self, request, pk=None):
