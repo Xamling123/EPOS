@@ -28,6 +28,12 @@ export const ordersAPI = {
     addItem: (orderId, itemData) =>
         api.post(`/orders/${orderId}/add_item/`, itemData),
 
+    updateItemQuantity: (orderId, itemId, quantity) =>
+        api.post(`/orders/${orderId}/update_item_quantity/`, { item_id: itemId, quantity }),
+    
+    removeItem: (orderId, itemId) =>
+        api.post(`/orders/${orderId}/remove_item/`, { item_id: itemId }),
+
     updateStatus: (orderId, status, priority = null) => {
         const data = { status }
         if (priority) data.priority = priority
