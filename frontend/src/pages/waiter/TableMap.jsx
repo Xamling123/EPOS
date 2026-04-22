@@ -29,11 +29,8 @@ export default function TableMap() {
 
     const handleTableClick = (table) => {
         if (table.status === 'occupied') {
-            // View active order (Not implemented in this step, but placeholder)
-            if (window.confirm(`Table ${table.table_number} is occupied. View order?`)) {
-                // navigate(`/waiter/orders/${table.active_order_id}`)
-                alert('Order viewing to be implemented in next step')
-            }
+            // View active order for this table
+            navigate(`/waiter/orders/${table.active_order_id}`)
         } else {
             // Navigate to Order Entry for this table
             navigate(`/waiter/order-entry/${table.id}`)
